@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<title>Cafeteria Igreja Onda</title>
+<meta name="theme-color" content="#1E3FA8">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Cafeteria Onda">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="manifest" href="manifest.json">
+<style>
+
+:root{
+  --azul:#1E3FA8;
+  --azul-esc:#152C77;
+  --azul-med:#3B63D6;
+  --azul-cl:#E9EEFB;
+  --azul-cl2:#D7E0F8;
+  --verde:#12855A;
+  --verde-esc:#0D6845;
+  --vermelho:#C23B2E;
+  --bg:#F1F4FB;
+  --card:#FFFFFF;
+  --txt:#16203A;
+  --muted:#6C7A99;
+  --linha:#DFE5F2;
+  --raio:14px;
+  --nav-h:66px;
+  --sombra:0 1px 2px rgba(21,44,119,.06), 0 6px 18px rgba(21,44,119,.08);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  background:var(--bg);color:var(--txt);
+  display:flex;flex-direction:column;height:100dvh;overflow:hidden;
+  font-size:16px;line-height:1.35;
+  -webkit-user-select:none;user-select:none;
+}
+button,input,select{font-family:inherit;font-size:inherit}
+button{cursor:pointer;border:0;background:none;color:inherit}
+
+/* ---------- HEADER ---------- */
+header{
+  background:linear-gradient(180deg,var(--azul) 0%,var(--azul-esc) 100%);
+  color:#fff;padding:calc(env(safe-area-inset-top) + 9px) 14px 9px;
+  display:flex;align-items:center;gap:12px;flex:0 0 auto;
+  box-shadow:0 2px 10px rgba(21,44,119,.25);z-index:20;
+}
+header img.logo{height:24px;width:auto;display:block}
+header .hoje{margin-left:auto;text-align:right;line-height:1.15}
+header .hoje b{display:block;font-size:17px;letter-spacing:.2px}
+header .hoje span{font-size:11px;opacity:.75;text-transform:uppercase;letter-spacing:.7px}
+
+/* ---------- TELAS ---------- */
+main{flex:1 1 auto;position:relative;overflow:hidden}
+.tela{position:absolute;inset:0;overflow:auto;display:none;-webkit-overflow-scrolling:touch}
+.tela.on{display:block}
+.tela.on.flex{display:flex}
+.pad{padding:14px}
+h2.titulo{margin:2px 0 12px;font-size:19px;font-weight:700;letter-spacing:-.2px}
+.sub{color:var(--muted);font-size:13px}
+
+/* ---------- CAIXA ---------- */
+#tela-caixa{flex-direction:row;gap:0}
+#col-produtos{flex:1 1 auto;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+#area-produtos{flex:1 1 auto;overflow:auto;padding:14px 14px 20px}
+#busca-wrap{position:relative;padding:12px 14px;flex:0 0 auto;border-bottom:1px solid var(--linha);background:var(--bg)}
+#busca-wrap svg{position:absolute;left:26px;top:50%;transform:translateY(-50%);width:19px;height:19px;
+  stroke:var(--muted);fill:none;stroke-width:2;stroke-linecap:round;pointer-events:none}
+#busca-wrap input{width:100%;padding:12px 12px 12px 42px;border:1.5px solid var(--linha);
+  border-radius:12px;font-size:16px;background:#fff;-webkit-user-select:text;user-select:text;
+  -webkit-appearance:none;appearance:none}
+#busca-wrap input:focus{outline:0;border-color:var(--azul-med)}
+.cat-titulo{font-size:12px;font-weight:800;color:var(--azul);text-transform:uppercase;
+  letter-spacing:1.1px;margin:14px 0 8px;display:flex;align-items:center;gap:8px}
+.cat-titulo:first-child{margin-top:0}
+.cat-titulo:after{content:"";flex:1;height:1px;background:var(--linha)}
+.grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:10px}
+.prod{
+  background:var(--card);border-radius:var(--raio);padding:12px;min-height:92px;
+  display:flex;flex-direction:column;justify-content:space-between;text-align:left;
+  box-shadow:var(--sombra);border:2px solid transparent;position:relative;
+  transition:transform .08s ease,border-color .12s ease;
+}
+.prod:active{transform:scale(.96)}
+.prod.tem{border-color:var(--azul-med)}
+.prod .nome{font-weight:600;font-size:15px;line-height:1.2}
+.prod .preco{font-weight:800;color:var(--azul);font-size:17px;margin-top:8px}
+.prod .badge{
+  position:absolute;top:-8px;right:-8px;min-width:26px;height:26px;border-radius:13px;
+  background:var(--azul-med);color:#fff;font-size:13px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;padding:0 7px;
+  box-shadow:0 2px 6px rgba(21,44,119,.35)}
+
+/* ---------- CARRINHO ---------- */
+#carrinho{
+  width:370px;flex:0 0 370px;background:#fff;border-left:1px solid var(--linha);
+  display:flex;flex-direction:column;z-index:15;
+}
+#carrinho h3{margin:0;padding:14px 14px 10px;font-size:16px;display:flex;align-items:center;gap:8px}
+#carrinho h3 button{margin-left:auto;font-size:13px;color:var(--vermelho);font-weight:600;padding:6px 8px}
+#lista-carrinho{flex:1 1 auto;overflow:auto;padding:0 12px 8px;min-height:60px}
+@media (max-width:900px){#lista-carrinho{max-height:40vh;flex:0 1 auto}}
+.vazio{color:var(--muted);text-align:center;padding:34px 16px;font-size:14px}
+.item{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--linha)}
+.item .info{flex:1;min-width:0}
+.item .info .n{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .info .u{font-size:12px;color:var(--muted)}
+.qtd{display:flex;align-items:center;gap:2px;background:var(--azul-cl);border-radius:10px;padding:2px}
+.qtd button{width:34px;height:34px;border-radius:8px;font-size:20px;font-weight:700;color:var(--azul);
+  display:flex;align-items:center;justify-content:center}
+.qtd button:active{background:var(--azul-cl2)}
+.qtd span{min-width:26px;text-align:center;font-weight:800;font-size:16px}
+.item .tot{font-weight:700;min-width:74px;text-align:right;font-size:15px}
+#rodape-carrinho{border-top:1px solid var(--linha);padding:12px 14px calc(env(safe-area-inset-bottom) + 12px);background:#fff}
+.linha-total{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px}
+.linha-total .lbl{font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;font-weight:700}
+.linha-total .val{font-size:31px;font-weight:800;color:var(--azul);letter-spacing:-.5px}
+.pg-lbl{font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:7px}
+.pgs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.pg{
+  background:var(--azul-cl);border:2px solid transparent;border-radius:11px;padding:11px 6px;
+  font-weight:700;font-size:14px;color:var(--azul-esc);display:flex;align-items:center;
+  justify-content:center;gap:6px;min-height:48px;text-align:center}
+.pg.sel{background:var(--azul);color:#fff;border-color:var(--azul-esc)}
+.pg .ic{font-size:16px}
+#box-troco{display:none;gap:8px;margin-bottom:12px;align-items:center}
+#box-troco.on{display:flex}
+#box-troco label{font-size:13px;color:var(--muted);font-weight:600;white-space:nowrap}
+#box-troco input{flex:1;min-width:0;padding:10px;border:1.5px solid var(--linha);border-radius:10px;
+  font-size:16px;font-weight:600;text-align:right}
+#troco-val{font-size:14px;font-weight:800;white-space:nowrap;min-width:96px;text-align:right}
+#btn-finalizar{
+  width:100%;background:var(--verde);color:#fff;border-radius:13px;padding:16px;
+  font-size:17px;font-weight:800;letter-spacing:.2px;box-shadow:0 3px 10px rgba(18,133,90,.3)}
+#btn-finalizar:disabled{background:#C6CDDD;color:#8A94AC;box-shadow:none}
+#btn-finalizar:active:not(:disabled){background:var(--verde-esc)}
+
+/* barra fixa (telas estreitas) */
+#barra-total{display:none}
+
+@media (max-width:900px){
+  #tela-caixa{flex-direction:column}
+  #col-produtos{flex:1 1 auto}
+  #area-produtos{padding-bottom:86px}
+  #carrinho{
+    position:fixed;left:0;right:0;bottom:0;top:auto;width:auto;flex:none;
+    height:auto;max-height:min(86vh,680px);border-left:0;border-top:1px solid var(--linha);
+    border-radius:20px 20px 0 0;box-shadow:0 -8px 30px rgba(21,44,119,.22);
+    transform:translateY(101%);transition:transform .24s cubic-bezier(.3,.8,.4,1);z-index:40}
+  #carrinho.aberto{transform:translateY(0)}
+  #carrinho h3:before{content:"";position:absolute;top:7px;left:50%;transform:translateX(-50%);
+    width:42px;height:4px;border-radius:2px;background:var(--linha)}
+  #carrinho h3{position:relative;padding-top:20px}
+  #barra-total{
+    display:flex;position:fixed;left:0;right:0;bottom:var(--nav-h);align-items:center;gap:12px;
+    background:var(--azul);color:#fff;padding:10px 14px;z-index:30;
+    box-shadow:0 -3px 14px rgba(21,44,119,.28)}
+  #barra-total .c{flex:1;line-height:1.15}
+  #barra-total .c small{display:block;font-size:11px;opacity:.8;text-transform:uppercase;letter-spacing:.7px}
+  #barra-total .c b{font-size:21px;font-weight:800}
+  #barra-total button{background:#fff;color:var(--azul);font-weight:800;padding:11px 16px;border-radius:11px;font-size:15px}
+  body.carrinho-aberto #barra-total{display:none}
+  body.carrinho-aberto nav#tabs{display:none}
+}
+
+/* ---------- NAV ---------- */
+nav#tabs{
+  flex:0 0 auto;display:flex;background:#fff;border-top:1px solid var(--linha);
+  padding-bottom:env(safe-area-inset-bottom);z-index:25}
+nav#tabs button{
+  flex:1;height:var(--nav-h);display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:3px;color:var(--muted);font-size:11.5px;font-weight:700;letter-spacing:.2px}
+nav#tabs button svg{width:23px;height:23px;stroke:currentColor;fill:none;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round}
+nav#tabs button.on{color:var(--azul)}
+nav#tabs button.on svg{stroke:var(--azul)}
+
+/* ---------- CARDS / TABELAS ---------- */
+.card{background:#fff;border-radius:var(--raio);box-shadow:var(--sombra);padding:14px;margin-bottom:12px}
+.card h3{margin:0 0 10px;font-size:14px;font-weight:800;color:var(--azul);text-transform:uppercase;letter-spacing:.9px}
+table.t{width:100%;border-collapse:collapse;font-size:15px}
+table.t th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.8px;
+  color:var(--muted);padding:0 0 7px;font-weight:800;border-bottom:1px solid var(--linha)}
+table.t td{padding:9px 0;border-bottom:1px solid var(--linha)}
+table.t tr:last-child td{border-bottom:0}
+table.t .num{text-align:right;white-space:nowrap}
+table.t tfoot td{font-weight:800;border-top:2px solid var(--azul);border-bottom:0;padding-top:10px;color:var(--azul)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:12px}
+.kpi{background:#fff;border-radius:var(--raio);box-shadow:var(--sombra);padding:13px 14px}
+.kpi small{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.9px;font-weight:800}
+.kpi b{display:block;font-size:25px;font-weight:800;color:var(--azul);letter-spacing:-.5px;margin-top:3px}
+.kpi.destaque{background:var(--azul)}
+.kpi.destaque small{color:#B9C7EE}
+.kpi.destaque b{color:#fff}
+
+/* ---------- BOTOES ---------- */
+.btn{background:var(--azul);color:#fff;border-radius:11px;padding:13px 16px;font-weight:700;
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;font-size:15px}
+.btn:active{background:var(--azul-esc)}
+.btn.sec{background:var(--azul-cl);color:var(--azul-esc)}
+.btn.perigo{background:#FBE9E7;color:var(--vermelho)}
+.btn.bloco{width:100%;margin-bottom:9px}
+.btn:disabled{opacity:.45}
+
+/* ---------- PRODUTOS ---------- */
+.linha-prod{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--linha)}
+.linha-prod:last-child{border-bottom:0}
+.linha-prod .nm{flex:1;min-width:0}
+.linha-prod .nm b{display:block;font-weight:600;font-size:15px}
+.linha-prod .nm small{color:var(--muted);font-size:12px}
+.linha-prod .pr{font-weight:800;color:var(--azul);white-space:nowrap}
+.linha-prod .acao{width:38px;height:38px;border-radius:10px;background:var(--azul-cl);
+  display:flex;align-items:center;justify-content:center}
+.linha-prod .acao svg{width:18px;height:18px;stroke:var(--azul);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.linha-prod.off{opacity:.45}
+
+/* ---------- MODAL ---------- */
+.modal{position:fixed;inset:0;background:rgba(16,26,55,.55);z-index:100;display:none;
+  align-items:center;justify-content:center;padding:16px}
+.modal.on{display:flex}
+.modal .box{background:#fff;border-radius:18px;width:100%;max-width:420px;padding:18px;
+  max-height:88dvh;overflow:auto;box-shadow:0 20px 60px rgba(10,20,50,.4)}
+.modal h3{margin:0 0 14px;font-size:18px}
+.campo{margin-bottom:12px}
+.campo label{display:block;font-size:12px;font-weight:800;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px}
+.campo input,.campo select{width:100%;padding:13px;border:1.5px solid var(--linha);
+  border-radius:11px;font-size:16px;background:#fff;-webkit-user-select:text;user-select:text}
+.campo input:focus,.campo select:focus{outline:0;border-color:var(--azul-med)}
+.modal .acoes{display:flex;gap:9px;margin-top:16px}
+.modal .acoes .btn{flex:1}
+
+/* ---------- TOAST ---------- */
+#toast{position:fixed;left:50%;bottom:96px;transform:translate(-50%,26px);opacity:0;
+  background:#16203A;color:#fff;padding:13px 20px;border-radius:12px;font-weight:700;font-size:15px;
+  z-index:200;pointer-events:none;transition:.22s;max-width:90vw;text-align:center;
+  box-shadow:0 8px 24px rgba(10,20,50,.35)}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+#aviso{background:#FFF4E5;color:#8A5A00;padding:10px 14px;font-size:13px;text-align:center;display:none}
+#aviso.on{display:block}
+
+/* ---------- IMPRESSAO ---------- */
+#impressao{display:none}
+@media print{
+  body{display:block;height:auto;overflow:visible;background:#fff}
+  header,main,nav#tabs,#barra-total,#toast,.modal,#aviso{display:none !important}
+  #impressao{display:block !important;padding:0;color:#000;font-size:12px}
+  @page{size:A4;margin:14mm}
+}
+#impressao .cab{display:flex;align-items:flex-end;gap:14px;border-bottom:2.5px solid #1E3FA8;padding-bottom:10px;margin-bottom:16px}
+#impressao .cab img{height:34px}
+#impressao .cab .tt{margin-left:auto;text-align:right}
+#impressao .cab .tt b{display:block;font-size:16px;color:#1E3FA8}
+#impressao .cab .tt span{font-size:11px;color:#555}
+#impressao h4{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#1E3FA8;
+  margin:18px 0 6px;border-bottom:1px solid #C9D4EE;padding-bottom:4px}
+#impressao table{width:100%;border-collapse:collapse;font-size:12px}
+#impressao th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.6px;
+  color:#555;border-bottom:1px solid #999;padding:3px 0}
+#impressao td{padding:4px 0;border-bottom:1px solid #E2E2E2}
+#impressao .num{text-align:right}
+#impressao tfoot td{font-weight:800;border-top:1.5px solid #1E3FA8;border-bottom:0;color:#1E3FA8;padding-top:6px}
+#impressao .resumo{display:flex;gap:10px;margin-bottom:6px}
+#impressao .resumo div{flex:1;border:1px solid #C9D4EE;border-radius:6px;padding:8px 10px}
+#impressao .resumo small{display:block;font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:#555}
+#impressao .resumo b{font-size:16px;color:#1E3FA8}
+#impressao .assin{margin-top:40px;display:flex;gap:40px;font-size:10px;color:#555}
+#impressao .assin div{flex:1;border-top:1px solid #666;padding-top:4px;text-align:center}
+#impressao .rodape{margin-top:14px;font-size:9px;color:#888;text-align:center}
+
+/* ================= NUVEM: LOGIN / ESTADOS ================= */
+#tela-login,#tela-espera,#tela-config{
+  position:fixed;inset:0;z-index:300;display:none;overflow:auto;
+  background:linear-gradient(160deg,var(--azul) 0%,var(--azul-esc) 100%);
+  padding:24px 16px calc(env(safe-area-inset-bottom) + 24px);
+  align-items:center;justify-content:center}
+#tela-login.on,#tela-espera.on,#tela-config.on{display:flex}
+.cartao-login{background:#fff;border-radius:20px;padding:26px 22px;width:100%;max-width:400px;
+  box-shadow:0 24px 60px rgba(8,20,60,.35)}
+.cartao-login .marca{text-align:center;margin-bottom:20px}
+.cartao-login .marca img{height:26px;width:auto}
+.cartao-login .marca p{margin:9px 0 0;font-size:13px;color:var(--muted);font-weight:700;
+  text-transform:uppercase;letter-spacing:1.1px}
+.cartao-login h3{margin:0 0 16px;font-size:19px;text-align:center}
+.cartao-login .btn{width:100%;margin-bottom:9px;padding:15px}
+.link-txt{display:block;width:100%;text-align:center;color:var(--azul);font-weight:700;
+  font-size:14px;padding:10px;margin-top:2px}
+.erro-box{background:#FDECEA;color:#A32B1E;border-radius:11px;padding:11px 13px;font-size:14px;
+  margin-bottom:13px;display:none;line-height:1.35}
+.erro-box.on{display:block}
+.ok-box{background:#E7F5EE;color:#0D6845;border-radius:11px;padding:11px 13px;font-size:14px;
+  margin-bottom:13px;display:none;line-height:1.35}
+.ok-box.on{display:block}
+#tela-espera .cartao-login,#tela-config .cartao-login{text-align:center}
+#tela-espera p,#tela-config p{color:var(--muted);font-size:15px;line-height:1.5;margin:0 0 16px}
+#tela-config .cartao-login{max-width:520px;text-align:left}
+#tela-config code{background:var(--azul-cl);color:var(--azul-esc);padding:2px 6px;border-radius:5px;
+  font-size:13px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all}
+#tela-config ol{margin:0 0 16px;padding-left:20px;color:var(--txt);font-size:14.5px;line-height:1.7}
+
+/* ================= HEADER: STATUS DE SINCRONIA ================= */
+header .status{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.6px;background:rgba(255,255,255,.14);
+  padding:5px 10px;border-radius:20px;white-space:nowrap}
+header .status .bolinha{width:8px;height:8px;border-radius:50%;background:#4ADE80;flex:0 0 auto}
+header .status.off{background:rgba(255,196,86,.22)}
+header .status.off .bolinha{background:#FFC456}
+header .hoje{margin-left:0}
+header .espaco{margin-left:auto}
+@media (max-width:560px){header .status span.txt{display:none}header .status{padding:6px}}
+
+/* ================= EQUIPE ================= */
+.usuario{display:flex;align-items:center;gap:11px;padding:12px 0;border-bottom:1px solid var(--linha)}
+.usuario:last-child{border-bottom:0}
+.usuario .av{width:40px;height:40px;border-radius:50%;background:var(--azul-cl);color:var(--azul);
+  display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex:0 0 auto}
+.usuario .dd{flex:1;min-width:0}
+.usuario .dd b{display:block;font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.usuario .dd small{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;display:block}
+.tag{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;
+  padding:4px 8px;border-radius:6px;background:var(--azul-cl);color:var(--azul-esc);white-space:nowrap}
+.tag.adm{background:var(--azul);color:#fff}
+.tag.pend{background:#FFF1DC;color:#8A5A00}
+.usuario .btn{padding:9px 12px;font-size:13px;white-space:nowrap}
+
+/* ================= DIVERSOS ================= */
+.aviso-inline{background:var(--azul-cl);color:var(--azul-esc);border-radius:11px;padding:11px 13px;
+  font-size:13.5px;line-height:1.45;margin-bottom:12px}
+.venda-cancelada td{opacity:.5;text-decoration:line-through}
+.carregando{display:flex;align-items:center;justify-content:center;gap:10px;padding:40px 16px;
+  color:var(--muted);font-size:14px}
+.spin{width:20px;height:20px;border:2.5px solid var(--azul-cl);border-top-color:var(--azul);
+  border-radius:50%;animation:gira .7s linear infinite}
+@keyframes gira{to{transform:rotate(360deg)}}
+.autor{font-size:11px;color:var(--muted)}
+</style>
+</head>
+<body>
+<!-- ===================== LOGIN ===================== -->
+<div id="tela-login">
+  <div class="cartao-login">
+    <div class="marca"><img src="logo-azul.png" alt="Igreja Onda" id="logo-login"><p>Cafeteria</p></div>
+    <h3 id="lg-titulo">Entrar</h3>
+    <div class="erro-box" id="lg-erro"></div>
+    <div class="ok-box" id="lg-ok"></div>
+    <div class="campo" id="campo-nome" style="display:none">
+      <label for="lg-nome">Seu nome</label>
+      <input id="lg-nome" type="text" autocomplete="name" placeholder="Como aparece no relatório">
+    </div>
+    <div class="campo">
+      <label for="lg-email">E-mail</label>
+      <input id="lg-email" type="email" autocomplete="email" inputmode="email" placeholder="voce@exemplo.com">
+    </div>
+    <div class="campo">
+      <label for="lg-senha">Senha</label>
+      <input id="lg-senha" type="password" autocomplete="current-password" placeholder="••••••">
+    </div>
+    <button class="btn" id="lg-acao">Entrar</button>
+    <button class="link-txt" id="lg-alternar">Não tenho conta — criar acesso</button>
+    <button class="link-txt" id="lg-esqueci" style="color:var(--muted)">Esqueci minha senha</button>
+  </div>
+</div>
+
+<!-- ===================== AGUARDANDO LIBERAÇÃO ===================== -->
+<div id="tela-espera">
+  <div class="cartao-login">
+    <div class="marca"><img src="logo-azul.png" alt="Igreja Onda" id="logo-espera"><p>Cafeteria</p></div>
+    <h3>Acesso aguardando liberação</h3>
+    <p>Sua conta foi criada, <b id="esp-nome">tudo certo</b>. Peça para um responsável da cafeteria liberar seu acesso na aba <b>Equipe</b>.</p>
+    <button class="btn sec" id="esp-recarregar">Já liberaram, verificar</button>
+    <button class="link-txt" id="esp-sair">Sair</button>
+  </div>
+</div>
+
+<!-- ===================== CONFIGURAÇÃO PENDENTE ===================== -->
+<div id="tela-config">
+  <div class="cartao-login">
+    <h3>Falta conectar o banco de dados</h3>
+    <p id="cfg-msg">O arquivo <code>config.js</code> ainda está com as chaves de exemplo.</p>
+    <ol>
+      <li>Abra o <b>Firebase</b> → seu projeto → <b>Configurações do projeto</b>.</li>
+      <li>Em <b>Seus apps</b>, copie o bloco <code>firebaseConfig</code>.</li>
+      <li>Cole dentro do arquivo <code>config.js</code> e publique de novo.</li>
+    </ol>
+    <p style="font-size:13px">O passo a passo completo está no arquivo <code>LEIA-ME.md</code>.</p>
+  </div>
+</div>
+
+<!-- ===================== APP ===================== -->
+<header>
+  <img class="logo" src="logo-branco.png" alt="Igreja Onda">
+  <div class="espaco"></div>
+  <div class="status" id="hd-status" title="Situação da sincronização">
+    <span class="bolinha"></span><span class="txt" id="hd-status-txt">Sincronizado</span>
+  </div>
+  <div class="hoje"><span>Vendas de hoje</span><b id="hd-hoje">R$ 0,00</b></div>
+</header>
+
+<div id="aviso"></div>
+
+<main>
+  <!-- ================= CAIXA ================= -->
+  <section id="tela-caixa" class="tela flex on">
+    <div id="col-produtos">
+      <div id="busca-wrap">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input id="in-busca" type="search" placeholder="Buscar produto..." autocomplete="off" autocorrect="off" spellcheck="false">
+      </div>
+      <div id="area-produtos"></div>
+    </div>
+
+    <aside id="carrinho">
+      <h3>Pedido <button id="btn-limpar">Limpar</button></h3>
+      <div id="lista-carrinho"></div>
+      <div id="rodape-carrinho">
+        <div class="linha-total"><span class="lbl">Total</span><span class="val" id="tot-val">R$ 0,00</span></div>
+        <div class="pg-lbl">Forma de pagamento</div>
+        <div class="pgs" id="pgs"></div>
+        <div id="box-troco">
+          <label for="in-recebido">Recebido</label>
+          <input id="in-recebido" type="text" inputmode="decimal" placeholder="0,00">
+          <span id="troco-val"></span>
+        </div>
+        <button id="btn-finalizar" disabled>Finalizar venda</button>
+      </div>
+    </aside>
+
+    <div id="barra-total">
+      <div class="c"><small id="bt-itens">0 itens</small><b id="bt-total">R$ 0,00</b></div>
+      <button id="bt-abrir">Ver pedido</button>
+    </div>
+  </section>
+
+  <!-- ================= PRODUTOS ================= -->
+  <section id="tela-produtos" class="tela">
+    <div class="pad">
+      <h2 class="titulo">Produtos</h2>
+      <div id="prod-topo"></div>
+      <div id="lista-produtos"></div>
+    </div>
+  </section>
+
+  <!-- ================= RELATÓRIO ================= -->
+  <section id="tela-relatorio" class="tela">
+    <div class="pad">
+      <h2 class="titulo">Relatório de vendas</h2>
+      <div class="card" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <div class="campo" style="margin:0;flex:1;min-width:170px">
+          <label for="in-data">Dia</label>
+          <input id="in-data" type="date">
+        </div>
+        <button class="btn sec" id="btn-hoje" style="margin-top:16px">Hoje</button>
+        <button class="btn" id="btn-imprimir" style="margin-top:16px">Imprimir / PDF</button>
+      </div>
+      <div id="conteudo-relatorio"></div>
+    </div>
+  </section>
+
+  <!-- ================= EQUIPE ================= -->
+  <section id="tela-equipe" class="tela">
+    <div class="pad">
+      <h2 class="titulo">Equipe</h2>
+      <div class="aviso-inline">Quem cria uma conta fica bloqueado até alguém liberar aqui.
+        <b>Administrador</b> pode mexer em produtos, cancelar vendas e liberar pessoas.</div>
+      <div id="lista-usuarios"></div>
+    </div>
+  </section>
+
+  <!-- ================= AJUSTES ================= -->
+  <section id="tela-ajustes" class="tela">
+    <div class="pad">
+      <h2 class="titulo">Ajustes</h2>
+      <div class="card">
+        <h3>Minha conta</h3>
+        <div class="usuario" id="minha-conta"></div>
+        <button class="btn bloco sec" id="btn-sair" style="margin-top:12px">Sair desta conta</button>
+      </div>
+      <div class="card" id="card-identificacao">
+        <h3>Identificação</h3>
+        <div class="campo"><label for="in-nome-loja">Nome da cafeteria</label>
+          <input id="in-nome-loja" type="text" placeholder="Cafeteria Igreja Onda"></div>
+        <div class="campo" style="margin:0"><label for="in-resp">Responsável (aparece no relatório)</label>
+          <input id="in-resp" type="text" placeholder="Opcional"></div>
+      </div>
+      <div class="card">
+        <h3>Backup das vendas</h3>
+        <p class="sub" style="margin:0 0 11px">As vendas ficam no banco de dados na nuvem e são as mesmas em todos os aparelhos. Este arquivo é uma cópia extra do dia escolhido no relatório.</p>
+        <button class="btn bloco sec" id="btn-exportar">Baixar cópia do dia (arquivo)</button>
+      </div>
+      <p class="sub" style="text-align:center;padding:6px 0 20px">
+        Cafeteria Igreja Onda &middot; versão 2.0 (nuvem)
+      </p>
+    </div>
+  </section>
+</main>
+
+<nav id="tabs">
+  <button data-tela="caixa" class="on">
+    <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="13" rx="2"/><path d="M2 11h20M7 7V4h10v3"/></svg>Caixa</button>
+  <button data-tela="produtos">
+    <svg viewBox="0 0 24 24"><path d="M4 7h13v10a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V7z"/><path d="M17 9h2a2 2 0 0 1 0 5h-2M7 3v2M11 3v2M15 3v2"/></svg>Produtos</button>
+  <button data-tela="relatorio">
+    <svg viewBox="0 0 24 24"><path d="M6 20V10M12 20V4M18 20v-7"/><path d="M3 20h18"/></svg>Relatório</button>
+  <button data-tela="equipe" id="tab-equipe" style="display:none">
+    <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>Equipe</button>
+  <button data-tela="ajustes">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 7.5 19.4l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 3 15H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 8.5l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.6 1.6 0 0 0 10 4.6V4a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 2.5 1.4l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0 1.1 2.7H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg>Ajustes</button>
+</nav>
+
+<!-- MODAL PRODUTO -->
+<div class="modal" id="modal-prod">
+  <div class="box">
+    <h3 id="mp-titulo">Novo produto</h3>
+    <div class="campo"><label for="mp-nome">Nome</label>
+      <input id="mp-nome" type="text" placeholder="Ex.: Café com leite" autocomplete="off"></div>
+    <div class="campo"><label for="mp-preco">Preço (R$)</label>
+      <input id="mp-preco" type="text" inputmode="decimal" placeholder="0,00"></div>
+    <div class="campo"><label for="mp-cat">Categoria</label>
+      <input id="mp-cat" type="text" placeholder="Ex.: Bebidas" list="dl-cats" autocomplete="off">
+      <datalist id="dl-cats"></datalist></div>
+    <div class="acoes">
+      <button class="btn sec" id="mp-cancelar">Cancelar</button>
+      <button class="btn" id="mp-salvar">Salvar</button>
+    </div>
+    <button class="btn bloco perigo" id="mp-excluir" style="margin-top:9px;display:none">Excluir produto</button>
+  </div>
+</div>
+
+<!-- MODAL CONFIRMA -->
+<div class="modal" id="modal-conf">
+  <div class="box" style="max-width:360px">
+    <h3 id="mc-titulo">Confirmar</h3>
+    <p id="mc-texto" style="margin:0 0 4px;color:var(--muted);font-size:15px"></p>
+    <div class="acoes">
+      <button class="btn sec" id="mc-nao">Cancelar</button>
+      <button class="btn perigo" id="mc-sim" style="font-weight:800">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="impressao"></div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
