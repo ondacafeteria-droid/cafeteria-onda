@@ -46,6 +46,30 @@ service cloud.firestore {
       allow write: if admin();
     }
 
+    // ---------- CAIXAS CADASTRADOS ----------
+    match /pontos/{id} {
+      allow read: if liberado();
+      // qualquer pessoa liberada pode cadastrar um caixa novo (evento)
+      allow create: if liberado();
+      // renomear e esconder são do admin
+      allow update: if admin();
+      allow delete: if false;
+    }
+
+    // ---------- ABERTURA / FECHAMENTO DE CAIXA ----------
+    match /sessoes/{id} {
+      allow read: if liberado();
+      allow create: if liberado()
+                    && request.resource.data.aberta == true
+                    && request.resource.data.abertaPorUid == request.auth.uid
+                    && request.resource.data.fundo is int
+                    && request.resource.data.fundo >= 0;
+      // fechar é permitido a quem está liberado, mas só enquanto o caixa está aberto;
+      // mexer num caixa já fechado é coisa de admin
+      allow update: if admin() || (liberado() && resource.data.aberta == true);
+      allow delete: if false;
+    }
+
     // ---------- VENDAS ----------
     match /vendas/{id} {
       allow read: if liberado();
@@ -53,7 +77,14 @@ service cloud.firestore {
                     && request.resource.data.uid == request.auth.uid
                     && request.resource.data.cancelada == false
                     && request.resource.data.total is int
-                    && request.resource.data.total >= 0;
+                    && request.resource.data.total >= 0
+                    // toda venda nasce amarrada a um caixa.
+                    // De proposito NAO exigimos aqui que o caixa ainda esteja aberto:
+                    // uma venda feita sem internet sobe depois, e se o caixa tivesse sido
+                    // fechado nesse meio tempo a venda seria rejeitada e perdida.
+                    // Quem bloqueia a venda sem caixa aberto e o aplicativo.
+                    && request.resource.data.sessaoId is string
+                    && request.resource.data.sessaoId.size() > 0;
       // venda registrada não se apaga nem se edita: só o admin pode cancelar
       allow update: if admin();
       allow delete: if false;

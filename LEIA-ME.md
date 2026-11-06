@@ -105,12 +105,42 @@ A partir daqui é tudo pelo app: cada voluntário cria a conta dele e **você li
 
 Abra o endereço no **Chrome** (ou Safari no iPhone) → menu **⋮** → **Instalar app** / **Adicionar à tela inicial**.
 
+## Abrir e fechar o caixa
+
+Toda venda precisa estar dentro de um caixa aberto — é o que permite conferir o dinheiro no fim.
+
+**Abrir:** na tela de Caixa, toque em **Abrir caixa**, escolha qual (Sábado, Domingo de manhã,
+Domingo à noite) e digite o **fundo de troco** que foi colocado na gaveta. Se for um evento fora
+do normal, toque em **+ Criar novo caixa** ali mesmo e dê um nome.
+
+**Vender:** a faixa no topo mostra em qual caixa você está. Mais de um caixa pode ficar aberto ao
+mesmo tempo; use **Trocar** para mudar de caixa ou abrir outro.
+
+**Fechar:** toque em **Fechar**. O app mostra quanto deveria ter na gaveta
+(fundo de troco + vendas em dinheiro), você conta o dinheiro de verdade e digita o valor.
+Ele calcula a sobra ou a falta na hora, aceita uma observação e congela o fechamento.
+Pix, débito e crédito aparecem só como conferência, já que não passam pela gaveta.
+
+**Esqueceu de fechar?** Na próxima vez que alguém abrir o app aparece uma faixa laranja avisando
+que tem caixa de outro dia em aberto. Tocar nela abre o fechamento daquele caixa.
+O app nunca fecha sozinho — fechamento automático esconderia a diferença de dinheiro.
+
+**Relatório:** a aba Relatório tem duas visões. **Dia** mostra tudo do dia, agora com o total
+separado por caixa. **Caixas** lista as aberturas daquele dia; tocar em uma abre o fechamento
+completo, com fundo, esperado, contado e diferença — e o botão Imprimir / PDF gera essa folha.
+
+**Cadastrar, renomear ou esconder caixas:** em Ajustes → Caixas cadastrados (só administrador).
+Esconder um caixa não apaga o histórico dele.
+
 ## Quem pode o quê
 
 | | Caixa | Administrador |
 |---|---|---|
 | Registrar vendas | sim | sim |
 | Ver relatórios | sim | sim |
+| Abrir e fechar o caixa | sim | sim |
+| Criar um caixa novo (evento) | sim | sim |
+| Renomear ou esconder um caixa | **não** | sim |
 | Criar/editar produtos e preços | **não** | sim |
 | Cancelar uma venda | **não** | sim |
 | Liberar e bloquear pessoas | **não** | sim |
@@ -124,7 +154,7 @@ aparecem nos outros celulares. **Só não feche o app antes de voltar a internet
 ## Publicar uma alteração depois
 
 1. Suba o arquivo alterado no GitHub (mesmo nome, substitui).
-2. Edite `sw.js` e troque `onda-pdv-nuvem-v1` por `...v2` (depois v3, v4...).
+2. Edite `sw.js` e aumente o número do cache (`onda-pdv-nuvem-v2` → `v3` → `v4`...).
 3. O Render publica sozinho. Nos celulares aparece a faixa azul *"Nova versão disponível"*.
 
 ## Limites do plano gratuito
@@ -141,3 +171,5 @@ O Firebase gratuito permite **20 mil gravações e 50 mil leituras por dia**. Um
 | Login não funciona só no celular/no endereço publicado | Passo 2.3 (domínio autorizado) não foi feito |
 | "Seu acesso não permite essa ação" | A pessoa não é admin, ou as regras (passo 7) não foram publicadas |
 | Produtos não aparecem | Falta importar a lista na aba Produtos |
+| "Abra o caixa para vender" | Normal: ninguém abriu o caixa ainda, ou você não escolheu em qual está |
+| Caixa some da lista ao abrir | Outra pessoa abriu esse mesmo caixa primeiro — toque nele para entrar junto |

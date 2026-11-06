@@ -1,6 +1,6 @@
 /* Cafeteria Igreja Onda (versão nuvem) - service worker
    Ao publicar uma versão nova do app, aumente o número em CACHE. */
-var CACHE = "onda-pdv-nuvem-v1";
+var CACHE = "onda-pdv-nuvem-v2";
 var ARQUIVOS = ["./", "./index.html", "./app.js", "./config.js", "./manifest.json",
                 "./logo-branco.png", "./logo-azul.png", "./icon-192.png", "./icon-512.png"];
 

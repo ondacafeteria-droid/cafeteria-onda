@@ -66,7 +66,7 @@ h2.titulo{margin:2px 0 12px;font-size:19px;font-weight:700;letter-spacing:-.2px}
 .sub{color:var(--muted);font-size:13px}
 
 /* ---------- CAIXA ---------- */
-#tela-caixa{flex-direction:row;gap:0}
+#tela-caixa{flex-direction:column;gap:0}
 #col-produtos{flex:1 1 auto;display:flex;flex-direction:column;min-width:0;overflow:hidden}
 #area-produtos{flex:1 1 auto;overflow:auto;padding:14px 14px 20px}
 #busca-wrap{position:relative;padding:12px 14px;flex:0 0 auto;border-bottom:1px solid var(--linha);background:var(--bg)}
@@ -145,7 +145,7 @@ h2.titulo{margin:2px 0 12px;font-size:19px;font-weight:700;letter-spacing:-.2px}
 #barra-total{display:none}
 
 @media (max-width:900px){
-  #tela-caixa{flex-direction:column}
+  #caixa-corpo{flex-direction:column}
   #col-produtos{flex:1 1 auto}
   #area-produtos{padding-bottom:86px}
   #carrinho{
@@ -340,6 +340,87 @@ header .espaco{margin-left:auto}
   border-radius:50%;animation:gira .7s linear infinite}
 @keyframes gira{to{transform:rotate(360deg)}}
 .autor{font-size:11px;color:var(--muted)}
+
+/* ================= CAIXA: ABERTURA / FECHAMENTO ================= */
+#caixa-corpo{flex:1 1 auto;display:flex;flex-direction:row;min-height:0;position:relative}
+#faixa-caixa{flex:0 0 auto;display:flex;align-items:center;gap:11px;padding:10px 14px;
+  background:#fff;border-bottom:1px solid var(--linha);min-height:58px}
+#faixa-caixa .pino{width:9px;height:9px;border-radius:50%;background:var(--verde);flex:0 0 auto;
+  box-shadow:0 0 0 3px rgba(18,133,90,.16)}
+#faixa-caixa.sem .pino{background:#D9A400;box-shadow:0 0 0 3px rgba(217,164,0,.18)}
+#faixa-caixa .txt{flex:1;min-width:0;line-height:1.25}
+#faixa-caixa .txt b{display:block;font-size:15px;font-weight:700;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+#faixa-caixa .txt small{display:block;font-size:12px;color:var(--muted)}
+#faixa-caixa.sem .txt b{color:#8A5A00}
+#faixa-caixa .btn{padding:10px 14px;font-size:14px;white-space:nowrap}
+#aviso-caixa{display:none;background:#FFF1DC;color:#8A5A00;padding:11px 14px;font-size:13.5px;
+  line-height:1.4;cursor:pointer;border-bottom:1px solid #F0DCB8}
+#aviso-caixa.on{display:block}
+#aviso-caixa b{font-weight:800}
+
+/* escolha do ponto no modal de abertura */
+.pontos-lista{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.ponto-op{background:var(--azul-cl);border:2px solid transparent;border-radius:12px;padding:13px 10px;
+  font-weight:700;font-size:14.5px;color:var(--azul-esc);min-height:52px;display:flex;
+  align-items:center;justify-content:center;text-align:center;line-height:1.2}
+.ponto-op.sel{background:var(--azul);color:#fff;border-color:var(--azul-esc)}
+.ponto-op.ocupado{opacity:.5}
+.ponto-op.novo{background:#fff;border:2px dashed var(--azul-cl2);color:var(--azul)}
+
+/* conferência do fechamento */
+.conf{border:1.5px solid var(--linha);border-radius:12px;overflow:hidden;margin-bottom:14px}
+.conf .l{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
+  padding:10px 13px;border-bottom:1px solid var(--linha);font-size:14.5px}
+.conf .l:last-child{border-bottom:0}
+.conf .l span{color:var(--muted)}
+.conf .l b{font-weight:700;white-space:nowrap}
+.conf .l.forte{background:var(--azul-cl)}
+.conf .l.forte span{color:var(--azul-esc);font-weight:700}
+.conf .l.forte b{color:var(--azul);font-size:18px;font-weight:800}
+.dif{border-radius:12px;padding:12px 14px;font-weight:800;font-size:15.5px;text-align:center;
+  margin-bottom:14px;display:none}
+.dif.on{display:block}
+.dif.ok{background:#E7F5EE;color:var(--verde-esc)}
+.dif.sobra{background:#E8EDFA;color:var(--azul-esc)}
+.dif.falta{background:#FDECEA;color:#A32B1E}
+.sub-conf{font-size:12px;color:var(--muted);margin:-6px 0 14px;line-height:1.45}
+
+/* relatório: alternador e sessões */
+.alternador{display:flex;background:var(--azul-cl);border-radius:12px;padding:4px;margin-bottom:12px}
+.alternador button{flex:1;padding:10px;border-radius:9px;font-weight:700;font-size:14px;color:var(--azul-esc)}
+.alternador button.on{background:#fff;color:var(--azul);box-shadow:var(--sombra)}
+.sessao{display:flex;align-items:center;gap:11px;padding:13px 0;border-bottom:1px solid var(--linha);
+  width:100%;text-align:left}
+.sessao:last-child{border-bottom:0}
+.sessao .ic{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;
+  justify-content:center;flex:0 0 auto;background:var(--azul-cl)}
+.sessao .ic svg{width:20px;height:20px;stroke:var(--azul);fill:none;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round}
+.sessao.viva .ic{background:#E7F5EE}
+.sessao.viva .ic svg{stroke:var(--verde)}
+.sessao .dd{flex:1;min-width:0}
+.sessao .dd b{display:block;font-size:15px;font-weight:700}
+.sessao .dd small{display:block;font-size:12px;color:var(--muted)}
+.sessao .vl{text-align:right;white-space:nowrap}
+.sessao .vl b{display:block;font-weight:800;color:var(--azul);font-size:15px}
+.sessao .vl small{font-size:11px;color:var(--muted)}
+.volta{display:inline-flex;align-items:center;gap:7px;color:var(--azul);font-weight:700;
+  font-size:14px;padding:8px 0;margin-bottom:6px}
+.volta svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2.4;
+  stroke-linecap:round;stroke-linejoin:round}
+.selo{display:inline-block;font-size:10.5px;font-weight:800;text-transform:uppercase;
+  letter-spacing:.7px;padding:3px 8px;border-radius:6px;margin-left:7px;vertical-align:1px}
+.selo.aberto{background:#E7F5EE;color:var(--verde-esc)}
+.selo.fechado{background:var(--azul-cl);color:var(--azul-esc)}
+
+/* impressão do fechamento */
+#impressao .conf-imp{display:flex;gap:10px;margin:6px 0 2px}
+#impressao .conf-imp div{flex:1;border:1px solid #C9D4EE;border-radius:6px;padding:8px 10px}
+#impressao .conf-imp small{display:block;font-size:9px;text-transform:uppercase;
+  letter-spacing:.8px;color:#555}
+#impressao .conf-imp b{font-size:14px;color:#1E3FA8}
+#impressao .obs{font-size:11px;color:#444;margin-top:10px;border-left:3px solid #C9D4EE;padding-left:9px}
 </style>
 </head>
 <body>
@@ -408,6 +489,9 @@ header .espaco{margin-left:auto}
 <main>
   <!-- ================= CAIXA ================= -->
   <section id="tela-caixa" class="tela flex on">
+    <div id="aviso-caixa"></div>
+    <div id="faixa-caixa"></div>
+    <div id="caixa-corpo">
     <div id="col-produtos">
       <div id="busca-wrap">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
@@ -436,6 +520,7 @@ header .espaco{margin-left:auto}
       <div class="c"><small id="bt-itens">0 itens</small><b id="bt-total">R$ 0,00</b></div>
       <button id="bt-abrir">Ver pedido</button>
     </div>
+    </div>
   </section>
 
   <!-- ================= PRODUTOS ================= -->
@@ -458,6 +543,10 @@ header .espaco{margin-left:auto}
         </div>
         <button class="btn sec" id="btn-hoje" style="margin-top:16px">Hoje</button>
         <button class="btn" id="btn-imprimir" style="margin-top:16px">Imprimir / PDF</button>
+      </div>
+      <div class="alternador" id="alt-relatorio">
+        <button data-modo="dia" class="on">Dia</button>
+        <button data-modo="caixas">Caixas</button>
       </div>
       <div id="conteudo-relatorio"></div>
     </div>
@@ -489,13 +578,20 @@ header .espaco{margin-left:auto}
         <div class="campo" style="margin:0"><label for="in-resp">Responsável (aparece no relatório)</label>
           <input id="in-resp" type="text" placeholder="Opcional"></div>
       </div>
+      <div class="card" id="card-pontos">
+        <h3>Caixas cadastrados</h3>
+        <p class="sub" style="margin:0 0 11px">São os pontos de venda que aparecem na hora de abrir
+          o caixa. Esconder um caixa não apaga o histórico dele.</p>
+        <div id="lista-pontos"></div>
+        <button class="btn bloco sec" id="btn-novo-ponto" style="margin-top:10px">+ Cadastrar caixa</button>
+      </div>
       <div class="card">
         <h3>Backup das vendas</h3>
         <p class="sub" style="margin:0 0 11px">As vendas ficam no banco de dados na nuvem e são as mesmas em todos os aparelhos. Este arquivo é uma cópia extra do dia escolhido no relatório.</p>
         <button class="btn bloco sec" id="btn-exportar">Baixar cópia do dia (arquivo)</button>
       </div>
       <p class="sub" style="text-align:center;padding:6px 0 20px">
-        Cafeteria Igreja Onda &middot; versão 2.0 (nuvem)
+        Cafeteria Igreja Onda &middot; versão 2.1 (nuvem)
       </p>
     </div>
   </section>
@@ -530,6 +626,69 @@ header .espaco{margin-left:auto}
       <button class="btn" id="mp-salvar">Salvar</button>
     </div>
     <button class="btn bloco perigo" id="mp-excluir" style="margin-top:9px;display:none">Excluir produto</button>
+  </div>
+</div>
+
+<!-- MODAL ABRIR CAIXA -->
+<div class="modal" id="modal-abrir">
+  <div class="box">
+    <h3>Abrir caixa</h3>
+    <div class="erro-box" id="ab-erro"></div>
+    <div class="pg-lbl" style="margin-bottom:7px">Qual caixa?</div>
+    <div class="pontos-lista" id="ab-pontos"></div>
+    <div class="campo" id="ab-campo-novo" style="display:none">
+      <label for="ab-novo-nome">Nome do novo caixa</label>
+      <input id="ab-novo-nome" type="text" placeholder="Ex.: Evento de Natal" autocomplete="off">
+    </div>
+    <div class="campo">
+      <label for="ab-fundo">Fundo de troco na gaveta (R$)</label>
+      <input id="ab-fundo" type="text" inputmode="decimal" placeholder="0,00">
+    </div>
+    <p class="sub-conf">É o dinheiro que já está na gaveta para dar troco. Ele não conta como venda —
+      serve para conferir o caixa no fechamento.</p>
+    <div class="acoes">
+      <button class="btn sec" id="ab-cancelar">Cancelar</button>
+      <button class="btn" id="ab-confirmar">Abrir caixa</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL FECHAR CAIXA -->
+<div class="modal" id="modal-fechar">
+  <div class="box">
+    <h3 id="fe-titulo">Fechar caixa</h3>
+    <p class="sub" id="fe-sub" style="margin:-8px 0 14px"></p>
+    <div class="erro-box" id="fe-erro"></div>
+    <div class="conf" id="fe-conf"></div>
+    <div class="campo">
+      <label for="fe-contado">Dinheiro contado na gaveta (R$)</label>
+      <input id="fe-contado" type="text" inputmode="decimal" placeholder="0,00">
+    </div>
+    <div class="dif" id="fe-dif"></div>
+    <div class="campo">
+      <label for="fe-obs">Observação (opcional)</label>
+      <input id="fe-obs" type="text" placeholder="Ex.: faltou troco de R$ 2">
+    </div>
+    <div class="acoes">
+      <button class="btn sec" id="fe-cancelar">Cancelar</button>
+      <button class="btn" id="fe-confirmar">Fechar caixa</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PONTO (cadastro/edição) -->
+<div class="modal" id="modal-ponto">
+  <div class="box" style="max-width:380px">
+    <h3 id="pt-titulo">Cadastrar caixa</h3>
+    <div class="campo" style="margin:0">
+      <label for="pt-nome">Nome</label>
+      <input id="pt-nome" type="text" placeholder="Ex.: Domingo à noite" autocomplete="off">
+    </div>
+    <div class="acoes">
+      <button class="btn sec" id="pt-cancelar">Cancelar</button>
+      <button class="btn" id="pt-salvar">Salvar</button>
+    </div>
+    <button class="btn bloco perigo" id="pt-ocultar" style="margin-top:9px;display:none">Esconder este caixa</button>
   </div>
 </div>
 

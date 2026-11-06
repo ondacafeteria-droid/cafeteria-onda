@@ -94,6 +94,13 @@ const CATALOGO_INICIAL = [
   {nome:"SALG. FANDANGOS 35G", preco:600, cat:"Salgadinhos"}
 ];
 
+const PONTOS_INICIAIS = [
+  { id:"sabado",        nome:"Sábado" },
+  { id:"domingo-manha", nome:"Domingo de manhã" },
+  { id:"domingo-noite", nome:"Domingo à noite" }
+];
+const CHAVE_CAIXA = "onda_caixa_ativo";
+
 /* ===================== ESTADO ===================== */
 const S = {
   usuario: null,        // usuário do Firebase Auth
@@ -101,7 +108,15 @@ const S = {
   produtos: [],
   vendasHoje: [],
   vendasDia: [],
+  vendasSessao: [],
   usuarios: [],
+  pontos: [],
+  sessoesAbertas: [],
+  sessoesDia: [],
+  sessaoAtivaId: null,
+  sessaoDetalhe: null,
+  modoRelatorio: "dia",
+  carregandoSessoes: true,
   config: {loja:"Cafeteria Igreja Onda", resp:""},
   carrinho: [],
   pagamentoSel: null,
@@ -113,6 +128,18 @@ const S = {
   carregandoVendas: true
 };
 const ehAdmin = () => S.perfil?.papel === "admin";
+const sessaoAtiva = () => S.sessoesAbertas.find(x => x.id === S.sessaoAtivaId) || null;
+const sessaoAbertaDoPonto = (pid) => S.sessoesAbertas.find(x => x.pontoId === pid) || null;
+function definirSessaoAtiva(id){
+  S.sessaoAtivaId = id || null;
+  try{
+    if(id) localStorage.setItem(CHAVE_CAIXA, id);
+    else localStorage.removeItem(CHAVE_CAIXA);
+  }catch(e){}
+}
+function acharSessao(id){
+  return S.sessoesAbertas.find(x => x.id === id) || S.sessoesDia.find(x => x.id === id) || null;
+}
 let FB = null;      // funções do Firebase
 let desinscrever = [];
 
@@ -274,7 +301,7 @@ function aplicarPerfil(){
   mostrarApp();
   $("#tab-equipe").style.display = ehAdmin() ? "flex" : "none";
   $("#card-identificacao").style.display = ehAdmin() ? "block" : "none";
-  renderMinhaConta();
+  renderMinhaConta(); renderPontos();
   if(!escutasDados){ escutasDados = true; ligarEscutas(); }
   else { renderProdutos(); renderRelatorio(); }
 }
@@ -309,8 +336,39 @@ function ligarEscutas(){
     }
   }, (e) => console.warn("config:", e)));
 
+  // pontos de caixa cadastrados
+  desinscrever.push(FB.onSnapshot(FB.collection(bd,"pontos"), (snap) => {
+    S.pontos = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+    if(!S.pontos.length) semearPontos();
+    renderPontos(); renderFaixa();
+  }, (e) => console.warn("pontos:", e)));
+
+  // caixas abertos (de qualquer dia)
+  desinscrever.push(FB.onSnapshot(
+    FB.query(FB.collection(bd,"sessoes"), FB.where("aberta","==",true)), (snap) => {
+      S.sessoesAbertas = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+      S.carregandoSessoes = false;
+      try{ if(!S.sessaoAtivaId) S.sessaoAtivaId = localStorage.getItem(CHAVE_CAIXA); }catch(e){}
+      if(S.sessaoAtivaId && !S.sessoesAbertas.some(x => x.id === S.sessaoAtivaId)) definirSessaoAtiva(null);
+      if(!S.sessaoAtivaId && S.sessoesAbertas.length === 1) definirSessaoAtiva(S.sessoesAbertas[0].id);
+      renderFaixa(); renderAvisoCaixa(); atualizarCaixa(); renderRelatorio();
+    }, (e) => { S.carregandoSessoes = false; console.warn("sessoes abertas:", e); }));
+
   if(ehAdmin()) ligarEscutaUsuarios();
   assinarDia(S.diaRelatorio);
+}
+
+let semeando = false;
+async function semearPontos(){
+  if(semeando) return;
+  semeando = true;
+  try{
+    const lote = FB.writeBatch(FB.bd);
+    PONTOS_INICIAIS.forEach((p, i) => {
+      lote.set(FB.doc(FB.bd, "pontos", p.id), { nome:p.nome, ativo:true, ordem:i });
+    });
+    await lote.commit();
+  }catch(e){ console.warn("semear pontos:", e); }
 }
 
 let offUsuarios = null;
@@ -323,9 +381,32 @@ function ligarEscutaUsuarios(){
   desinscrever.push(() => { offUsuarios && offUsuarios(); offUsuarios = null; });
 }
 
+let offSessoesDia = null;
+function assinarSessoesDia(chave){
+  if(offSessoesDia){ offSessoesDia(); offSessoesDia = null; }
+  offSessoesDia = FB.onSnapshot(
+    FB.query(FB.collection(FB.bd,"sessoes"), FB.where("dia","==",chave)),
+    (snap) => { S.sessoesDia = snap.docs.map(d => ({ id:d.id, ...d.data() })); renderRelatorio(); },
+    (e) => console.warn("sessoes dia:", e));
+  desinscrever.push(() => { offSessoesDia && offSessoesDia(); offSessoesDia = null; });
+}
+
+let offSessaoVendas = null;
+function assinarVendasSessao(id){
+  if(offSessaoVendas){ offSessaoVendas(); offSessaoVendas = null; }
+  S.vendasSessao = [];
+  if(!id) return;
+  offSessaoVendas = FB.onSnapshot(
+    FB.query(FB.collection(FB.bd,"vendas"), FB.where("sessaoId","==",id)),
+    (snap) => { S.vendasSessao = snap.docs.map(d => ({ id:d.id, ...d.data() })); renderRelatorio(); },
+    (e) => console.warn("vendas sessao:", e));
+  desinscrever.push(() => { offSessaoVendas && offSessaoVendas(); offSessaoVendas = null; });
+}
+
 let offDia = null;
 function assinarDia(chave){
   const hoje = chaveDia(Date.now());
+  assinarSessoesDia(chave);
   if(offDia){ offDia(); offDia = null; }
   if(chave === hoje){
     S.vendasDia = S.vendasHoje;
@@ -464,10 +545,13 @@ function atualizarCaixa(){
   $("#bt-total").textContent = money(tot);
   const n = qtdItens();
   $("#bt-itens").textContent = n===1 ? "1 item" : `${n} itens`;
-  renderGrade(); renderCarrinho(); renderPagamentos();
+  renderGrade(); renderCarrinho(); renderPagamentos(); renderFaixa();
   const ok = calcTroco();
-  $("#btn-finalizar").disabled = !(S.carrinho.length && S.pagamentoSel && ok);
-  $("#btn-finalizar").textContent = S.carrinho.length ? "Finalizar venda · " + money(tot) : "Finalizar venda";
+  const sa = sessaoAtiva();
+  const btn = $("#btn-finalizar");
+  btn.disabled = !(S.carrinho.length && S.pagamentoSel && ok && sa);
+  if(!sa && !S.carregandoSessoes) btn.textContent = "Abra o caixa para vender";
+  else btn.textContent = S.carrinho.length ? "Finalizar venda · " + money(tot) : "Finalizar venda";
 }
 
 const abrirCarrinho  = () => { $("#carrinho").classList.add("aberto"); document.body.classList.add("carrinho-aberto"); };
@@ -476,6 +560,8 @@ const fecharCarrinho = () => { $("#carrinho").classList.remove("aberto"); docume
 function finalizar(){
   const tot = totalCarrinho();
   if(!S.carrinho.length || !S.pagamentoSel) return;
+  const sa = sessaoAtiva();
+  if(!sa){ toast("Abra um caixa antes de vender"); abrirModalCaixa(); return; }
   const rec = S.pagamentoSel === "dinheiro" ? parseMoney($("#in-recebido").value) : 0;
   if(S.pagamentoSel === "dinheiro" && rec && rec < tot) return;
 
@@ -491,7 +577,10 @@ function finalizar(){
     troco: (rec && rec >= tot) ? (rec - tot) : null,
     cancelada: false,
     uid: S.usuario.uid,
-    autor: S.perfil?.nome || S.usuario.email
+    autor: S.perfil?.nome || S.usuario.email,
+    sessaoId: sa.id,
+    pontoId: sa.pontoId,
+    pontoNome: sa.pontoNome
   };
 
   // não esperamos a nuvem responder: offline a promessa só resolve depois
@@ -505,6 +594,316 @@ function finalizar(){
   S.carrinho = []; S.pagamentoSel = null;
   $("#in-recebido").value = ""; $("#in-busca").value = "";
   atualizarCaixa(); fecharCarrinho(); $("#area-produtos").scrollTop = 0; toast(msg);
+}
+
+
+/* ===================== ABRIR / FECHAR CAIXA ===================== */
+function renderFaixa(){
+  const f = $("#faixa-caixa");
+  if(!f) return;
+  f.innerHTML = "";
+  const sa = sessaoAtiva();
+  f.classList.toggle("sem", !sa);
+  f.appendChild(el("div","pino"));
+
+  const t = el("div","txt");
+  if(sa){
+    t.appendChild(el("b", null, sa.pontoNome));
+    const outroDia = sa.dia !== chaveDia(Date.now());
+    t.appendChild(el("small", null,
+      "Aberto " + (outroDia ? "em " + dataBR(sa.dia) + " às " : "às ") + hora(sa.abertaEmLocal) +
+      (sa.abertaPorNome ? " por " + String(sa.abertaPorNome).split(" ")[0] : "")));
+  }else{
+    t.appendChild(el("b", null, "Nenhum caixa aberto"));
+    t.appendChild(el("small", null, S.sessoesAbertas.length
+      ? "Escolha em qual caixa você está vendendo"
+      : "Abra um caixa para começar a vender"));
+  }
+  f.appendChild(t);
+
+  if(sa){
+    // sempre disponível: serve para trocar de caixa e também para abrir um segundo
+    const tr = el("button","btn sec","Trocar");
+    tr.addEventListener("click", abrirModalCaixa);
+    f.appendChild(tr);
+    const fe = el("button","btn","Fechar");
+    fe.addEventListener("click", () => abrirModalFechar(sa.id));
+    f.appendChild(fe);
+  }else{
+    const ab = el("button","btn", S.sessoesAbertas.length ? "Escolher caixa" : "Abrir caixa");
+    ab.addEventListener("click", abrirModalCaixa);
+    f.appendChild(ab);
+  }
+}
+
+function renderAvisoCaixa(){
+  const a = $("#aviso-caixa");
+  if(!a) return;
+  const hoje = chaveDia(Date.now());
+  const velhas = S.sessoesAbertas.filter(x => x.dia !== hoje);
+  if(!velhas.length){ a.classList.remove("on"); a.onclick = null; return; }
+  const v = velhas.sort((x,y) => (x.dia||"").localeCompare(y.dia||""))[0];
+  a.innerHTML = "<b>Caixa não fechado.</b> “" + esc(v.pontoNome) + "” foi aberto em " +
+    esc(dataBR(v.dia)) + " e continua aberto" +
+    (velhas.length > 1 ? " (e mais " + (velhas.length-1) + ")" : "") + ". Toque aqui para fechar.";
+  a.classList.add("on");
+  a.onclick = () => abrirModalFechar(v.id);
+}
+
+/* ---------- modal: escolher / abrir ---------- */
+let pontoSel = null;   // {id, nome} ou {novo:true}
+
+function abrirModalCaixa(){
+  pontoSel = null;
+  document.querySelector("#modal-abrir h3").textContent =
+    sessaoAtiva() ? "Trocar ou abrir caixa" : "Abrir caixa";
+  $("#ab-erro").classList.remove("on");
+  $("#ab-novo-nome").value = "";
+  $("#ab-fundo").value = "";
+  $("#ab-campo-novo").style.display = "none";
+  renderEscolhaPontos();
+  atualizarModalAbrir();
+  $("#modal-abrir").classList.add("on");
+}
+const fecharModalCaixa = () => { $("#modal-abrir").classList.remove("on"); pontoSel = null; };
+
+function renderEscolhaPontos(){
+  const box = $("#ab-pontos"); box.innerHTML = "";
+  const ativos = S.pontos.filter(p => p.ativo !== false)
+    .sort((a,b) => (a.ordem ?? 99) - (b.ordem ?? 99) || a.nome.localeCompare(b.nome,"pt-BR"));
+  ativos.forEach(p => {
+    const sa = sessaoAbertaDoPonto(p.id);
+    const b = el("button","ponto-op" + (pontoSel && pontoSel.id === p.id ? " sel" : ""));
+    b.appendChild(el("span", null, p.nome + (sa ? " · aberto " + hora(sa.abertaEmLocal) : "")));
+    b.addEventListener("click", () => {
+      pontoSel = { id:p.id, nome:p.nome, sessao: sa ? sa.id : null };
+      $("#ab-campo-novo").style.display = "none";
+      renderEscolhaPontos(); atualizarModalAbrir();
+    });
+    box.appendChild(b);
+  });
+  const novo = el("button","ponto-op novo" + (pontoSel && pontoSel.novo ? " sel" : ""), "+ Criar novo caixa");
+  novo.addEventListener("click", () => {
+    pontoSel = { novo:true };
+    $("#ab-campo-novo").style.display = "block";
+    renderEscolhaPontos(); atualizarModalAbrir();
+    setTimeout(() => $("#ab-novo-nome").focus(), 60);
+  });
+  box.appendChild(novo);
+}
+
+function atualizarModalAbrir(){
+  const entrando = !!(pontoSel && pontoSel.sessao);
+  $("#ab-fundo").closest(".campo").style.display = entrando ? "none" : "block";
+  document.querySelector("#modal-abrir .sub-conf").style.display = entrando ? "none" : "block";
+  $("#ab-confirmar").textContent = entrando ? "Vender neste caixa" : "Abrir caixa";
+}
+
+async function confirmarAbertura(){
+  const err = $("#ab-erro");
+  err.classList.remove("on");
+  if(!pontoSel){ err.textContent = "Escolha um caixa."; return err.classList.add("on"); }
+
+  // já está aberto: só entra nele
+  if(pontoSel.sessao){
+    definirSessaoAtiva(pontoSel.sessao);
+    fecharModalCaixa(); renderFaixa(); atualizarCaixa();
+    return toast("Vendendo em " + pontoSel.nome);
+  }
+
+  const btn = $("#ab-confirmar");
+  btn.disabled = true; btn.textContent = "Abrindo...";
+  try{
+    let pid = pontoSel.id, pnome = pontoSel.nome;
+    if(pontoSel.novo){
+      pnome = $("#ab-novo-nome").value.trim();
+      if(!pnome){ err.textContent = "Dê um nome para o novo caixa."; err.classList.add("on"); return; }
+      const ref = FB.doc(FB.collection(FB.bd,"pontos"));
+      await FB.setDoc(ref, { nome:pnome, ativo:true, ordem:90 });
+      pid = ref.__id || ref.id;
+    }
+    if(sessaoAbertaDoPonto(pid)){
+      err.textContent = "Esse caixa acabou de ser aberto em outro aparelho."; return err.classList.add("on");
+    }
+    const agora = Date.now();
+    const ref = await FB.addDoc(FB.collection(FB.bd,"sessoes"), {
+      pontoId: pid, pontoNome: pnome,
+      dia: chaveDia(agora), aberta: true,
+      fundo: parseMoney($("#ab-fundo").value),
+      abertaEm: FB.serverTimestamp(), abertaEmLocal: agora,
+      abertaPorUid: S.usuario.uid, abertaPorNome: S.perfil?.nome || S.usuario.email
+    });
+    definirSessaoAtiva(ref.id);
+    fecharModalCaixa(); renderFaixa(); atualizarCaixa();
+    toast("Caixa " + pnome + " aberto");
+  }catch(e){
+    err.textContent = traduzErro(e); err.classList.add("on");
+  }finally{
+    btn.disabled = false; atualizarModalAbrir();
+  }
+}
+
+/* ---------- modal: fechar ---------- */
+let sessaoFechando = null, totaisFechando = null;
+
+async function totaisDaSessao(id){
+  const out = { dinheiro:0, pix:0, debito:0, credito:0, total:0, nvendas:0 };
+  const q = FB.query(FB.collection(FB.bd,"vendas"), FB.where("sessaoId","==",id));
+  let snap;
+  try{ snap = await FB.getDocs(q); }
+  catch(e){
+    try{ snap = await FB.getDocsFromCache(q); }
+    catch(e2){ console.warn("totais sessao:", e2); return out; }
+  }
+  snap.docs.forEach(d => {
+    const v = d.data();
+    if(v.cancelada) return;
+    out[v.pagamento] = (out[v.pagamento] || 0) + (v.total || 0);
+    out.total += v.total || 0;
+    out.nvendas++;
+  });
+  return out;
+}
+
+async function abrirModalFechar(id){
+  const sa = acharSessao(id);
+  if(!sa) return toast("Caixa não encontrado");
+  if(sa.aberta === false) return toast("Esse caixa já está fechado");
+  sessaoFechando = sa; totaisFechando = null;
+  $("#fe-titulo").textContent = "Fechar " + sa.pontoNome;
+  $("#fe-sub").textContent = "Aberto em " + dataBR(sa.dia) + " às " + hora(sa.abertaEmLocal) +
+    (sa.abertaPorNome ? " por " + sa.abertaPorNome : "");
+  $("#fe-erro").classList.remove("on");
+  $("#fe-contado").value = ""; $("#fe-obs").value = "";
+  $("#fe-dif").classList.remove("on");
+  $("#fe-conf").innerHTML = '<div class="l"><span>Somando as vendas...</span><b></b></div>';
+  $("#fe-confirmar").disabled = true;
+  $("#modal-fechar").classList.add("on");
+
+  const t = await totaisDaSessao(id);
+  totaisFechando = { ...t, fundo: sa.fundo || 0, esperado: (sa.fundo || 0) + t.dinheiro };
+  renderConferencia();
+  $("#fe-confirmar").disabled = false;
+}
+const fecharModalFechar = () => {
+  $("#modal-fechar").classList.remove("on");
+  sessaoFechando = null; totaisFechando = null;
+};
+
+function renderConferencia(){
+  const t = totaisFechando; if(!t) return;
+  const linha = (rot, val, cls) =>
+    '<div class="l' + (cls ? " " + cls : "") + '"><span>' + rot + '</span><b>' + esc(money(val)) + '</b></div>';
+  $("#fe-conf").innerHTML =
+    linha("Fundo de troco", t.fundo) +
+    linha("Vendas em dinheiro", t.dinheiro) +
+    linha("Deveria ter na gaveta", t.esperado, "forte") +
+    linha("Pix", t.pix) +
+    linha("Débito", t.debito) +
+    linha("Crédito", t.credito) +
+    linha("Total vendido (" + t.nvendas + " venda" + (t.nvendas === 1 ? "" : "s") + ")", t.total);
+  calcDiferenca();
+}
+
+function calcDiferenca(){
+  const d = $("#fe-dif");
+  if(!totaisFechando){ d.classList.remove("on"); return; }
+  const txt = $("#fe-contado").value.trim();
+  if(!txt){ d.classList.remove("on"); return; }
+  const dif = parseMoney(txt) - totaisFechando.esperado;
+  d.className = "dif on " + (dif === 0 ? "ok" : (dif > 0 ? "sobra" : "falta"));
+  d.textContent = dif === 0 ? "Confere certinho"
+    : (dif > 0 ? "Sobrando " + money(dif) + " na gaveta" : "Faltando " + money(-dif));
+}
+
+async function confirmarFechamento(){
+  const sa = sessaoFechando, t = totaisFechando;
+  if(!sa || !t) return;
+  const err = $("#fe-erro"); err.classList.remove("on");
+  const txt = $("#fe-contado").value.trim();
+  if(!txt){ err.textContent = "Conte o dinheiro da gaveta e digite o valor."; return err.classList.add("on"); }
+  const contado = parseMoney(txt);
+  const btn = $("#fe-confirmar");
+  btn.disabled = true; btn.textContent = "Fechando...";
+  try{
+    const agora = Date.now();
+    await FB.updateDoc(FB.doc(FB.bd,"sessoes",sa.id), {
+      aberta: false,
+      fechadaEm: FB.serverTimestamp(), fechadaEmLocal: agora,
+      fechadaPorUid: S.usuario.uid, fechadaPorNome: S.perfil?.nome || S.usuario.email,
+      contado, esperado: t.esperado, diferenca: contado - t.esperado,
+      totais: { dinheiro:t.dinheiro, pix:t.pix, debito:t.debito, credito:t.credito,
+                total:t.total, nvendas:t.nvendas },
+      observacao: $("#fe-obs").value.trim() || null
+    });
+    if(S.sessaoAtivaId === sa.id) definirSessaoAtiva(null);
+    fecharModalFechar(); renderFaixa(); renderAvisoCaixa(); atualizarCaixa();
+    const dif = contado - t.esperado;
+    toast(dif === 0 ? "Caixa fechado, dinheiro confere"
+      : "Caixa fechado · " + (dif > 0 ? "sobra " : "falta ") + money(Math.abs(dif)));
+  }catch(e){
+    err.textContent = traduzErro(e); err.classList.add("on");
+  }finally{
+    btn.disabled = false; btn.textContent = "Fechar caixa";
+  }
+}
+
+/* ---------- cadastro de pontos (Ajustes) ---------- */
+let pontoEditando = null;
+
+function renderPontos(){
+  const box = $("#lista-pontos");
+  if(!box) return;
+  const card = $("#card-pontos");
+  if(card) card.style.display = ehAdmin() ? "block" : "none";
+  box.innerHTML = "";
+  if(!S.pontos.length){ box.appendChild(el("div","vazio","Nenhum caixa cadastrado.")); return; }
+  S.pontos.slice().sort((a,b) => (a.ordem ?? 99) - (b.ordem ?? 99) ||
+                                 a.nome.localeCompare(b.nome,"pt-BR")).forEach(p => {
+    const row = el("div","linha-prod" + (p.ativo === false ? " off" : ""));
+    const nm = el("div","nm");
+    nm.appendChild(el("b", null, p.nome));
+    const sa = sessaoAbertaDoPonto(p.id);
+    if(p.ativo === false) nm.appendChild(el("small", null, "Escondido"));
+    else if(sa) nm.appendChild(el("small", null, "Aberto agora"));
+    row.appendChild(nm);
+    const lapis = el("button","acao");
+    lapis.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>';
+    lapis.addEventListener("click", () => abrirModalPonto(p));
+    row.appendChild(lapis);
+    box.appendChild(row);
+  });
+}
+
+function abrirModalPonto(p){
+  pontoEditando = p || null;
+  $("#pt-titulo").textContent = p ? "Editar caixa" : "Cadastrar caixa";
+  $("#pt-nome").value = p ? p.nome : "";
+  const esconder = $("#pt-ocultar");
+  esconder.style.display = p ? "flex" : "none";
+  if(p) esconder.textContent = p.ativo === false ? "Mostrar este caixa" : "Esconder este caixa";
+  $("#modal-ponto").classList.add("on");
+  setTimeout(() => $("#pt-nome").focus(), 70);
+}
+const fecharModalPonto = () => { $("#modal-ponto").classList.remove("on"); pontoEditando = null; };
+
+async function salvarPonto(){
+  const nome = $("#pt-nome").value.trim();
+  if(!nome) return toast("Dê um nome para o caixa");
+  try{
+    if(pontoEditando) await FB.updateDoc(FB.doc(FB.bd,"pontos",pontoEditando.id), { nome });
+    else await FB.addDoc(FB.collection(FB.bd,"pontos"), { nome, ativo:true, ordem:90 });
+    fecharModalPonto(); toast("Caixa salvo");
+  }catch(e){ toast(traduzErro(e)); }
+}
+
+async function alternarPonto(){
+  const p = pontoEditando; if(!p) return;
+  if(p.ativo !== false && sessaoAbertaDoPonto(p.id)) return toast("Feche este caixa antes de escondê-lo");
+  try{
+    await FB.updateDoc(FB.doc(FB.bd,"pontos",p.id), { ativo: p.ativo === false });
+    fecharModalPonto(); toast("Pronto");
+  }catch(e){ toast(traduzErro(e)); }
 }
 
 /* ===================== PRODUTOS ===================== */
@@ -650,56 +1049,64 @@ function resumo(vendas){
   return { total, nvendas: validas.length, prods, pgs, canceladas: vendas.length - validas.length };
 }
 
-function renderRelatorio(){
-  const box = $("#conteudo-relatorio");
-  const chave = S.diaRelatorio;
-  const vendas = ordenadas(S.vendasDia);
-  const r = resumo(vendas);
+function agruparPorCaixa(vendas){
+  const m = {};
+  vendas.filter(v => !v.cancelada).forEach(v => {
+    const k = v.pontoNome || "Sem caixa";
+    m[k] ||= { nome:k, qtd:0, total:0 };
+    m[k].qtd++; m[k].total += v.total || 0;
+  });
+  return Object.values(m).sort((a,b) => b.total - a.total || a.nome.localeCompare(b.nome,"pt-BR"));
+}
+
+function blocoKpis(r){
+  return '<div class="kpis">'
+    + '<div class="kpi destaque"><small>Total recebido</small><b>' + esc(money(r.total)) + '</b></div>'
+    + '<div class="kpi"><small>Vendas</small><b>' + r.nvendas + '</b></div>'
+    + '<div class="kpi"><small>Ticket médio</small><b>'
+    + esc(money(r.nvendas ? Math.round(r.total / r.nvendas) : 0)) + '</b></div></div>';
+}
+
+function tabelasVendas(vendas, r){
   let h = "";
-
-  h += '<div class="kpis">';
-  h += `<div class="kpi destaque"><small>Total recebido</small><b>${esc(money(r.total))}</b></div>`;
-  h += `<div class="kpi"><small>Vendas</small><b>${r.nvendas}</b></div>`;
-  h += `<div class="kpi"><small>Ticket médio</small><b>${esc(money(r.nvendas ? Math.round(r.total/r.nvendas) : 0))}</b></div>`;
-  h += "</div>";
-
-  if(S.carregandoVendas){
-    box.innerHTML = h + '<div class="card"><div class="carregando"><div class="spin"></div><span>Carregando vendas...</span></div></div>';
-    return;
-  }
-  if(!vendas.length){
-    box.innerHTML = h + `<div class="card"><div class="vazio">Nenhuma venda registrada em ${esc(dataBR(chave))}.</div></div>`;
-    return;
-  }
-
   h += '<div class="card"><h3>Por forma de pagamento</h3><table class="t"><thead><tr>'
      + '<th>Forma</th><th class="num">Vendas</th><th class="num">Valor</th></tr></thead><tbody>';
-  r.pgs.forEach(p => { h += `<tr><td>${esc(p.nome)}</td><td class="num">${p.qtd}</td><td class="num">${esc(money(p.total))}</td></tr>`; });
-  h += `</tbody><tfoot><tr><td>Total</td><td class="num">${r.nvendas}</td><td class="num">${esc(money(r.total))}</td></tr></tfoot></table></div>`;
+  r.pgs.forEach(p => { h += '<tr><td>' + esc(p.nome) + '</td><td class="num">' + p.qtd
+     + '</td><td class="num">' + esc(money(p.total)) + '</td></tr>'; });
+  h += '</tbody><tfoot><tr><td>Total</td><td class="num">' + r.nvendas
+     + '</td><td class="num">' + esc(money(r.total)) + '</td></tr></tfoot></table></div>';
 
   h += '<div class="card"><h3>Produtos vendidos</h3><table class="t"><thead><tr>'
      + '<th>Produto</th><th class="num">Qtd</th><th class="num">Valor</th></tr></thead><tbody>';
   let somaQ = 0;
-  r.prods.forEach(p => { somaQ += p.qtd; h += `<tr><td>${esc(p.nome)}</td><td class="num">${p.qtd}</td><td class="num">${esc(money(p.total))}</td></tr>`; });
-  h += `</tbody><tfoot><tr><td>Total</td><td class="num">${somaQ}</td><td class="num">${esc(money(r.total))}</td></tr></tfoot></table></div>`;
+  r.prods.forEach(p => { somaQ += p.qtd; h += '<tr><td>' + esc(p.nome) + '</td><td class="num">' + p.qtd
+     + '</td><td class="num">' + esc(money(p.total)) + '</td></tr>'; });
+  h += '</tbody><tfoot><tr><td>Total</td><td class="num">' + somaQ
+     + '</td><td class="num">' + esc(money(r.total)) + '</td></tr></tfoot></table></div>';
 
-  h += '<div class="card"><h3>Vendas do dia</h3><table class="t"><thead><tr>'
+  h += '<div class="card"><h3>Vendas</h3><table class="t"><thead><tr>'
      + '<th>Hora</th><th>Itens</th><th>Pgto</th><th class="num">Valor</th><th></th></tr></thead><tbody>';
   vendas.forEach(v => {
-    const desc = (v.itens||[]).map(i => `${i.qtd}x ${i.nome}`).join(", ");
-    h += `<tr class="${v.cancelada ? "venda-cancelada" : ""}">`
-       + `<td>${esc(hora(v.tsLocal))}${v.autor ? `<div class="autor">${esc(String(v.autor).split(" ")[0])}</div>` : ""}</td>`
-       + `<td style="font-size:13px;color:var(--muted)">${esc(desc)}</td>`
-       + `<td style="font-size:13px">${esc(nomePg(v.pagamento))}</td>`
-       + `<td class="num">${esc(money(v.total))}</td>`
-       + `<td class="num">${(ehAdmin() && !v.cancelada)
-            ? `<button class="del-venda" data-id="${esc(v.id)}" style="color:var(--vermelho);font-size:19px;padding:2px 6px" title="Cancelar venda">&times;</button>` : ""}</td></tr>`;
+    const desc = (v.itens||[]).map(i => i.qtd + "x " + i.nome).join(", ");
+    h += '<tr class="' + (v.cancelada ? "venda-cancelada" : "") + '">'
+       + '<td>' + esc(hora(v.tsLocal)) + (v.autor ? '<div class="autor">'
+            + esc(String(v.autor).split(" ")[0]) + '</div>' : "") + '</td>'
+       + '<td style="font-size:13px;color:var(--muted)">' + esc(desc) + '</td>'
+       + '<td style="font-size:13px">' + esc(nomePg(v.pagamento)) + '</td>'
+       + '<td class="num">' + esc(money(v.total)) + '</td>'
+       + '<td class="num">' + ((ehAdmin() && !v.cancelada)
+            ? '<button class="del-venda" data-id="' + esc(v.id)
+              + '" style="color:var(--vermelho);font-size:19px;padding:2px 6px" title="Cancelar venda">&times;</button>'
+            : "") + '</td></tr>';
   });
-  h += "</tbody></table>";
-  if(r.canceladas) h += `<p class="sub" style="margin:10px 0 0">${r.canceladas} venda(s) cancelada(s) não entram no total.</p>`;
-  h += "</div>";
-  box.innerHTML = h;
+  h += '</tbody></table>';
+  if(r.canceladas) h += '<p class="sub" style="margin:10px 0 0">' + r.canceladas
+     + ' venda(s) cancelada(s) não entram no total.</p>';
+  h += '</div>';
+  return h;
+}
 
+function ligarCancelamentos(box){
   box.querySelectorAll(".del-venda").forEach(btn => {
     btn.addEventListener("click", () => {
       confirmar("Cancelar venda","A venda deixa de contar no relatório, mas fica registrada como cancelada.", async () => {
@@ -714,15 +1121,195 @@ function renderRelatorio(){
   });
 }
 
-function montarImpressao(){
+function renderRelatorio(){
+  const box = $("#conteudo-relatorio");
+  if(!box) return;
+  $$("#alt-relatorio button").forEach(b => b.classList.toggle("on", b.dataset.modo === S.modoRelatorio));
+  if(S.modoRelatorio === "caixas"){
+    if(S.sessaoDetalhe) renderDetalheSessao(box);
+    else renderListaSessoes(box);
+  }else{
+    renderRelatorioDia(box);
+  }
+}
+
+function renderRelatorioDia(box){
   const chave = S.diaRelatorio;
   const vendas = ordenadas(S.vendasDia);
+  const r = resumo(vendas);
+  let h = blocoKpis(r);
+
+  if(S.carregandoVendas){
+    box.innerHTML = h + '<div class="card"><div class="carregando"><div class="spin"></div><span>Carregando vendas...</span></div></div>';
+    return;
+  }
+  if(!vendas.length){
+    box.innerHTML = h + '<div class="card"><div class="vazio">Nenhuma venda registrada em '
+      + esc(dataBR(chave)) + '.</div></div>';
+    return;
+  }
+
+  const caixas = agruparPorCaixa(vendas);
+  if(caixas.length){
+    h += '<div class="card"><h3>Por caixa</h3><table class="t"><thead><tr>'
+       + '<th>Caixa</th><th class="num">Vendas</th><th class="num">Valor</th></tr></thead><tbody>';
+    caixas.forEach(c => { h += '<tr><td>' + esc(c.nome) + '</td><td class="num">' + c.qtd
+       + '</td><td class="num">' + esc(money(c.total)) + '</td></tr>'; });
+    h += '</tbody><tfoot><tr><td>Total</td><td class="num">' + r.nvendas
+       + '</td><td class="num">' + esc(money(r.total)) + '</td></tr></tfoot></table></div>';
+  }
+
+  h += tabelasVendas(vendas, r);
+  box.innerHTML = h;
+  ligarCancelamentos(box);
+}
+
+function totalVivoDaSessao(id){
+  const v = S.vendasDia.filter(x => x.sessaoId === id && !x.cancelada);
+  return { total: v.reduce((a,x) => a + (x.total||0), 0), nvendas: v.length };
+}
+
+function renderListaSessoes(box){
+  const sess = S.sessoesDia.slice().sort((a,b) => (a.abertaEmLocal||0) - (b.abertaEmLocal||0));
+  let h = "";
+  if(!sess.length){
+    box.innerHTML = '<div class="card"><div class="vazio">Nenhum caixa foi aberto em '
+      + esc(dataBR(S.diaRelatorio)) + '.</div></div>';
+    return;
+  }
+  const card = el("div","card");
+  card.appendChild(el("h3", null, "Caixas de " + dataBR(S.diaRelatorio)));
+  sess.forEach(x => {
+    const viva = x.aberta !== false;
+    const t = viva ? totalVivoDaSessao(x.id)
+                   : { total: x.totais?.total ?? 0, nvendas: x.totais?.nvendas ?? 0 };
+    const b = el("button","sessao" + (viva ? " viva" : ""));
+    const ic = el("div","ic");
+    ic.innerHTML = viva
+      ? '<svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="13" rx="2"/><path d="M2 11h20M7 7V4h10v3"/></svg>'
+      : '<svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+    b.appendChild(ic);
+    const dd = el("div","dd");
+    const nome = el("b"); nome.textContent = x.pontoNome;
+    const selo = el("span","selo " + (viva ? "aberto" : "fechado"), viva ? "Aberto" : "Fechado");
+    nome.appendChild(selo);
+    dd.appendChild(nome);
+    dd.appendChild(el("small", null,
+      hora(x.abertaEmLocal) + (viva ? " · em andamento" : " → " + hora(x.fechadaEmLocal)) +
+      (x.abertaPorNome ? " · " + String(x.abertaPorNome).split(" ")[0] : "")));
+    b.appendChild(dd);
+    const vl = el("div","vl");
+    vl.appendChild(el("b", null, money(t.total)));
+    const dif = x.aberta === false ? (x.diferenca || 0) : null;
+    vl.appendChild(el("small", null, dif === null ? t.nvendas + (t.nvendas === 1 ? " venda" : " vendas")
+      : (dif === 0 ? "confere" : (dif > 0 ? "sobra " + money(dif) : "falta " + money(-dif)))));
+    b.appendChild(vl);
+    b.addEventListener("click", () => {
+      S.sessaoDetalhe = x.id;
+      assinarVendasSessao(x.id);
+      renderRelatorio();
+    });
+    card.appendChild(b);
+  });
+  box.innerHTML = "";
+  box.appendChild(card);
+}
+
+function renderDetalheSessao(box){
+  const x = acharSessao(S.sessaoDetalhe);
+  if(!x){
+    S.sessaoDetalhe = null; assinarVendasSessao(null);
+    return renderListaSessoes(box);
+  }
+  const viva = x.aberta !== false;
+  const vendas = ordenadas(S.vendasSessao);
+  const r = resumo(vendas);
+  const dinheiro = vendas.filter(v => !v.cancelada && v.pagamento === "dinheiro")
+                         .reduce((a,v) => a + (v.total||0), 0);
+  const esperado = (x.fundo || 0) + dinheiro;
+
+  let h = "";
+  h += '<div class="card"><h3>Caixa</h3>';
+  h += '<div class="conf">';
+  const l = (rot, val, cls) => '<div class="l' + (cls ? " " + cls : "") + '"><span>' + rot
+      + '</span><b>' + val + '</b></div>';
+  h += l("Caixa", esc(x.pontoNome));
+  h += l("Aberto", esc(dataBR(x.dia) + " às " + hora(x.abertaEmLocal)
+      + (x.abertaPorNome ? " · " + String(x.abertaPorNome).split(" ")[0] : "")));
+  h += l("Fechado", viva ? "<span style='color:var(--verde)'>em andamento</span>"
+      : esc(dataBR(chaveDia(x.fechadaEmLocal)) + " às " + hora(x.fechadaEmLocal)
+        + (x.fechadaPorNome ? " · " + String(x.fechadaPorNome).split(" ")[0] : "")));
+  h += l("Fundo de troco", esc(money(x.fundo || 0)));
+  h += l("Vendas em dinheiro", esc(money(dinheiro)));
+  h += l(viva ? "Deveria ter na gaveta agora" : "Deveria ter na gaveta",
+         esc(money(viva ? esperado : (x.esperado ?? esperado))), "forte");
+  if(!viva){
+    h += l("Dinheiro contado", esc(money(x.contado || 0)));
+    const d = x.diferenca || 0;
+    const cor = d === 0 ? "var(--verde)" : (d > 0 ? "var(--azul)" : "var(--vermelho)");
+    h += l("Diferença", "<span style='color:" + cor + "'>" + esc(d === 0 ? "confere"
+        : (d > 0 ? "sobra " + money(d) : "falta " + money(-d))) + "</span>");
+  }
+  h += '</div>';
+  if(x.observacao) h += '<p class="sub" style="margin:0 0 10px">“' + esc(x.observacao) + '”</p>';
+  if(viva) h += '<button class="btn bloco" id="det-fechar">Fechar este caixa</button>';
+  h += '</div>';
+
+  h += blocoKpis(r);
+  h += vendas.length ? tabelasVendas(vendas, r)
+     : '<div class="card"><div class="vazio">Nenhuma venda neste caixa.</div></div>';
+
+  const volta = el("button","volta");
+  volta.innerHTML = '<svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>Todos os caixas do dia';
+  volta.addEventListener("click", () => {
+    S.sessaoDetalhe = null; assinarVendasSessao(null); renderRelatorio();
+  });
+  box.innerHTML = h;
+  box.insertBefore(volta, box.firstChild);
+  ligarCancelamentos(box);
+  const bf = $("#det-fechar");
+  if(bf) bf.addEventListener("click", () => abrirModalFechar(x.id));
+}
+
+function montarImpressao(sessaoId){
+  const sess = sessaoId ? acharSessao(sessaoId) : null;
+  const chave = sess ? sess.dia : S.diaRelatorio;
+  const vendas = ordenadas(sess ? S.vendasSessao : S.vendasDia);
   const r = resumo(vendas);
   const ag = Date.now();
   let h = "";
   h += `<div class="cab"><img src="logo-azul.png" alt="Igreja Onda">`
      + `<div class="tt"><b>${esc(S.config.loja || "Cafeteria")}</b>`
-     + `<span>Relatório de vendas &middot; ${esc(dataBR(chave))}</span></div></div>`;
+     + `<span>${sess ? "Fechamento de caixa &middot; " + esc(sess.pontoNome) + " &middot; "
+                     : "Relatório de vendas &middot; "}${esc(dataBR(chave))}</span></div></div>`;
+
+  if(sess){
+    const viva = sess.aberta !== false;
+    const dinheiro = vendas.filter(v => !v.cancelada && v.pagamento === "dinheiro")
+                           .reduce((a,v) => a + (v.total||0), 0);
+    const esperado = viva ? (sess.fundo||0) + dinheiro : (sess.esperado ?? (sess.fundo||0) + dinheiro);
+    h += '<div class="conf-imp">'
+       + '<div><small>Fundo de troco</small><b>' + esc(money(sess.fundo || 0)) + '</b></div>'
+       + '<div><small>Vendas em dinheiro</small><b>' + esc(money(dinheiro)) + '</b></div>'
+       + '<div><small>Esperado na gaveta</small><b>' + esc(money(esperado)) + '</b></div>'
+       + '</div>';
+    if(!viva){
+      const d = sess.diferenca || 0;
+      h += '<div class="conf-imp">'
+         + '<div><small>Dinheiro contado</small><b>' + esc(money(sess.contado || 0)) + '</b></div>'
+         + '<div><small>Diferença</small><b>' + esc(d === 0 ? "confere"
+              : (d > 0 ? "sobra " + money(d) : "falta " + money(-d))) + '</b></div>'
+         + '<div><small>Fechado por</small><b style="font-size:11px">'
+              + esc((sess.fechadaPorNome || "") + " · " + hora(sess.fechadaEmLocal)) + '</b></div>'
+         + '</div>';
+    }else{
+      h += '<p style="font-size:10px;color:#A86A00;margin:6px 0 0">Este caixa ainda está aberto — os valores podem mudar.</p>';
+    }
+    h += '<p style="font-size:10px;color:#555;margin:8px 0 0">Aberto em '
+       + esc(dataBR(sess.dia) + " às " + hora(sess.abertaEmLocal)
+             + (sess.abertaPorNome ? " por " + sess.abertaPorNome : "")) + '</p>';
+    if(sess.observacao) h += '<div class="obs">' + esc(sess.observacao) + '</div>';
+  }
   h += '<div class="resumo">'
      + `<div><small>Total recebido</small><b>${esc(money(r.total))}</b></div>`
      + `<div><small>Nº de vendas</small><b>${r.nvendas}</b></div>`
@@ -732,6 +1319,18 @@ function montarImpressao(){
   if(!r.nvendas){
     h += "<p style='margin-top:24px'>Nenhuma venda registrada nesta data.</p>";
     $("#impressao").innerHTML = h; return;
+  }
+
+  if(!sess){
+    const caixas = agruparPorCaixa(vendas);
+    if(caixas.length > 1){
+      h += '<h4>Por caixa</h4><table><thead><tr>'
+         + '<th>Caixa</th><th class="num">Vendas</th><th class="num">Valor</th></tr></thead><tbody>';
+      caixas.forEach(c => { h += '<tr><td>' + esc(c.nome) + '</td><td class="num">' + c.qtd
+         + '</td><td class="num">' + esc(money(c.total)) + '</td></tr>'; });
+      h += '</tbody><tfoot><tr><td>TOTAL</td><td class="num">' + r.nvendas
+         + '</td><td class="num">' + esc(money(r.total)) + '</td></tr></tfoot></table>';
+    }
   }
 
   h += '<h4>Recebimentos por forma de pagamento</h4><table><thead><tr>'
@@ -756,7 +1355,8 @@ function montarImpressao(){
        + `<td>${esc(v.autor || "")}</td><td class="num">${esc(money(v.total))}</td></tr>`;
   });
   h += "</tbody></table>";
-  h += `<div class="assin"><div>${esc(S.config.resp || "Responsável pelo caixa")}</div><div>Conferido por</div></div>`;
+  h += `<div class="assin"><div>${esc(sess ? (sess.fechadaPorNome || sess.abertaPorNome || "Responsável pelo caixa")
+       : (S.config.resp || "Responsável pelo caixa"))}</div><div>Conferido por</div></div>`;
   h += `<div class="rodape">Emitido em ${esc(dataBR(chaveDia(ag)) + " às " + hora(ag))}</div>`;
   $("#impressao").innerHTML = h;
 }
@@ -862,6 +1462,8 @@ function irPara(nome){
   if(nome === "produtos") renderProdutos();
   if(nome === "relatorio") renderRelatorio();
   if(nome === "equipe") renderUsuarios();
+  if(nome === "ajustes") renderPontos();
+  if(nome === "caixa"){ renderFaixa(); renderAvisoCaixa(); }
   fecharCarrinho();
 }
 
@@ -932,14 +1534,39 @@ async function init(){
   $("#in-data").value = S.diaRelatorio;
   $("#in-data").addEventListener("change", function(){
     S.diaRelatorio = this.value || chaveDia(Date.now());
+    S.sessaoDetalhe = null; assinarVendasSessao(null);
     assinarDia(S.diaRelatorio);
   });
   $("#btn-hoje").addEventListener("click", () => {
     S.diaRelatorio = chaveDia(Date.now());
     $("#in-data").value = S.diaRelatorio;
+    S.sessaoDetalhe = null; assinarVendasSessao(null);
     assinarDia(S.diaRelatorio);
   });
-  $("#btn-imprimir").addEventListener("click", () => { montarImpressao(); setTimeout(() => window.print(), 120); });
+  $("#btn-imprimir").addEventListener("click", () => {
+    montarImpressao(S.modoRelatorio === "caixas" ? S.sessaoDetalhe : null);
+    setTimeout(() => window.print(), 120);
+  });
+  $$("#alt-relatorio button").forEach(b => b.addEventListener("click", () => {
+    S.modoRelatorio = b.dataset.modo;
+    if(S.modoRelatorio !== "caixas"){ S.sessaoDetalhe = null; assinarVendasSessao(null); }
+    renderRelatorio();
+  }));
+
+  // abrir / fechar caixa
+  $("#ab-cancelar").addEventListener("click", fecharModalCaixa);
+  $("#ab-confirmar").addEventListener("click", confirmarAbertura);
+  $("#modal-abrir").addEventListener("click", function(e){ if(e.target === this) fecharModalCaixa(); });
+  $("#ab-novo-nome").addEventListener("keydown", (e) => { if(e.key === "Enter") confirmarAbertura(); });
+  $("#fe-cancelar").addEventListener("click", fecharModalFechar);
+  $("#fe-confirmar").addEventListener("click", confirmarFechamento);
+  $("#fe-contado").addEventListener("input", calcDiferenca);
+  $("#modal-fechar").addEventListener("click", function(e){ if(e.target === this) fecharModalFechar(); });
+  $("#btn-novo-ponto").addEventListener("click", () => abrirModalPonto(null));
+  $("#pt-cancelar").addEventListener("click", fecharModalPonto);
+  $("#pt-salvar").addEventListener("click", salvarPonto);
+  $("#pt-ocultar").addEventListener("click", alternarPonto);
+  $("#modal-ponto").addEventListener("click", function(e){ if(e.target === this) fecharModalPonto(); });
   $("#in-nome-loja").addEventListener("input", salvarConfig);
   $("#in-resp").addEventListener("input", salvarConfig);
   $("#btn-exportar").addEventListener("click", exportarDia);
@@ -981,6 +1608,8 @@ async function init(){
   });
 
   window.__api = { S, FB, addItem, finalizar, montarImpressao, resumo, irPara, atualizarCaixa,
+                   abrirModalCaixa, abrirModalFechar, totaisDaSessao, renderRelatorio,
+                   sessaoAtiva, definirSessaoAtiva,
                    setPg: (p) => { S.pagamentoSel = p; atualizarCaixa(); } };
 }
 
